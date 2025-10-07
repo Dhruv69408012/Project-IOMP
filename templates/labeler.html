@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Segment Labeler</title>
+    <style>
+      body {
+        font-family: Segoe UI, Roboto, Arial, sans-serif;
+        margin: 0;
+        background: #0f0f0f;
+        color: #e6e6e6;
+      }
+      .header,
+      .footer {
+        padding: 12px 16px;
+        background: #181818;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .container {
+        padding: 12px 16px;
+      }
+      .controls button {
+        margin-right: 8px;
+      }
+      img.preview {
+        max-width: 100%;
+        max-height: 70vh;
+        border: 1px solid #333;
+        background: #111;
+      }
+      .labels button {
+        margin: 6px 6px 0 0;
+        padding: 10px 14px;
+      }
+      button {
+        background: #2a2a2a;
+        color: #fff;
+        border: 1px solid #444;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      button.primary {
+        background: #0a7cff;
+        border-color: #0a7cff;
+      }
+      button.warning {
+        background: #8a2be2;
+        border-color: #6c1bbd;
+      }
+      .badge {
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <div class="controls">
+        <button id="prevBtn">◀ Prev</button>
+        <button id="nextBtn">Next ▶</button>
+      </div>
+      <div>
+        <span id="pos" class="badge"></span>
+        <span id="currentLabel" class="badge" style="margin-left: 12px"
+          >Label: (none)</span
+        >
+      </div>
+      <div>
+        <button id="commitBtn" class="primary">Commit</button>
+      </div>
+    </div>
+
+    <div class="container">
+      <div>
+        <img id="img" class="preview" alt="segment" />
+      </div>
+      <div class="labels">
+        <button data-label="F">F</button>
+        <button data-label="LA">LA</button>
+        <button data-label="RS">RS</button>
+        <button data-label="CL">CL</button>
+        <button data-label="OL">OL</button>
+        <button data-label="P">P</button>
+        <button data-label="OS">OS</button>
+        <button data-label="NO">NO</button>
+        <button id="clearBtn" class="warning">Clear</button>
+      </div>
+    </div>
+
+    <div class="footer">
+      <div id="path"></div>
+      <div id="status"></div>
+    </div>
+
+    <script>
+      let segments = [];
+      let idx = 0;
+
+      async function loadSegments() {
+        const res = await fetch("/api/segments");
+        const data = await res.json();
+        segments = data.segments || [];
+        idx = 0;
+        showCurrent();
+      }
+
+      function showCurrent() {
+        if (!segments.length) return;
+        idx = Math.max(0, Math.min(idx, segments.length - 1));
+        const s = segments[idx];
+        // Use online URL directly
+        document.getElementById("img").src = s.url || "";
+        document.getElementById("pos").textContent = `${idx + 1}/${
+          segments.length
+        }`;
+        document.getElementById("currentLabel").textContent =
+          "Label: " + (s.label || "(none)");
+        document.getElementById("path").textContent = s.url || "";
+      }
+
+      async function setPending(label) {
+        if (!segments.length) return;
+        const s = segments[idx];
+        s.label = label; // update local view
+        document.getElementById("currentLabel").textContent =
+          "Label: " + (s.label || "(none)");
+        await fetch("/api/pending", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: s.id, label }),
+        });
+      }
+
+      document.getElementById("prevBtn").onclick = () => {
+        idx = (idx - 1 + segments.length) % segments.length;
+        showCurrent();
+      };
+      document.getElementById("nextBtn").onclick = () => {
+        idx = (idx + 1) % segments.length;
+        showCurrent();
+      };
+      document.getElementById("commitBtn").onclick = async () => {
+        const res = await fetch("/api/commit", { method: "POST" });
+        const data = await res.json();
+        document.getElementById("status").textContent = data.ok
+          ? "Committed."
+          : data.error || "Commit failed";
+        await loadSegments();
+      };
+      document.getElementById("clearBtn").onclick = () => setPending("");
+      document.querySelectorAll(".labels button[data-label]").forEach((btn) => {
+        btn.onclick = () => setPending(btn.getAttribute("data-label"));
+      });
+
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "ArrowLeft") {
+          document.getElementById("prevBtn").click();
+        }
+        if (e.key === "ArrowRight") {
+          document.getElementById("nextBtn").click();
+        }
+        if ("123456".includes(e.key)) {
+          setPending(e.key);
+        }
+        if (e.key === "0" || e.key === "Backspace" || e.key === "Delete") {
+          setPending("");
+        }
+      });
+
+      loadSegments();
+    </script>
+  </body>
+</html>
