@@ -35,12 +35,13 @@ def load_segments_from_db() -> List[Dict[str, Any]]:
 	try:
 		# Filter: label IS NULL OR label = ''
 		response = (
-			supabase
-			.table("segment_images")
-			.select("*")
-			.or_("label.is.null")
-			.execute()
+		    supabase
+		    .table("segment_images")
+		    .select("*")
+		    .is_("label", "null")   # ✅ Only rows where label IS NULL
+		    .execute()
 		)
+
 		rows = response.data or []
 		for row in rows:
 			segment_id = row.get("id")
