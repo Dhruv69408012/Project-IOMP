@@ -83,43 +83,42 @@ def api_pending() -> Any:
 
 @app.post("/api/commit")
 def api_commit() -> Any:
-	"""
-	Commit pending labels back to the Supabase table.
-	Also rebuilds the Excel sheet for offline reference.
-	"""
-	segments = load_segments_from_db()
-	for segment in segments:
-		segment_id = segment["id"]
-		if segment_id in pending_labels:
-			label = pending_labels[segment_id]
-			try:
-				supabase.table("segment_images").update({"label": label}).eq("id", segment_id).execute()
-			except Exception as e:
-				print(f"❌ Failed to update segment {segment_id}: {e}")
+    """
+    Commit pending labels back to the Supabase table.
+    Also rebuilds the Excel sheet for offline reference.
+    """
+    # ✅ Commit all pending labels directly
+    for segment_id, label in pending_labels.items():
+        try:
+            supabase.table("segment_images").update({"label": label}).eq("id", segment_id).execute()
+        except Exception as e:
+            print(f"❌ Failed to update segment {segment_id}: {e}")
 
-	wb = Workbook()
-	ws = wb.active
-	ws.title = "results"
-	ws.cell(row=1, column=1, value="segment_name")
-	ws.cell(row=1, column=2, value="url")
-	ws.cell(row=1, column=3, value="label")
-	ws.column_dimensions['A'].width = 40
-	ws.column_dimensions['B'].width = 80
-	ws.column_dimensions['C'].width = 15
+    # ✅ Optionally reload all segments to build Excel
+    response = supabase.table("segment_images").select("*").execute()
+    segments = response.data or []
 
-	row_idx = 2
-	for segment in segments:
-		url = segment["url"]
-		label = segment.get("label", "")
-		segment_name = segment.get("segment_name", "")
-		ws.cell(row=row_idx, column=1, value=segment_name)
-		ws.cell(row=row_idx, column=2, value=url)
-		ws.cell(row=row_idx, column=3, value=label)
-		row_idx += 1
+    # ✅ Build Excel
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "results"
+    ws.cell(row=1, column=1, value="segment_name")
+    ws.cell(row=1, column=2, value="url")
+    ws.cell(row=1, column=3, value="label")
+    ws.column_dimensions['A'].width = 40
+    ws.column_dimensions['B'].width = 80
+    ws.column_dimensions['C'].width = 15
 
-	wb.save(XLSX_PATH)
-	pending_labels.clear()
-	return jsonify({"ok": True})
+    for i, segment in enumerate(segments, start=2):
+        ws.cell(row=i, column=1, value=segment.get("segment_name", ""))
+        ws.cell(row=i, column=2, value=segment.get("url", ""))
+        ws.cell(row=i, column=3, value=segment.get("label", ""))
+
+    wb.save(XLSX_PATH)
+
+    pending_labels.clear()
+    return jsonify({"ok": True})
+
 
 
 if __name__ == "__main__":
