@@ -38,7 +38,7 @@ def load_segments_from_db() -> List[Dict[str, Any]]:
 			supabase
 			.table("segment_images")
 			.select("*")
-			.or_("label.is.null,label.eq.")
+			.or_("label.is.null")
 			.execute()
 		)
 		rows = response.data or []
