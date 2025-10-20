@@ -38,7 +38,7 @@ def load_segments_from_db() -> List[Dict[str, Any]]:
 		    supabase
 		    .table("segment_images")
 		    .select("*")
-		    .is_("label", "null")   # ✅ Only rows where label IS NULL
+		    .filter("label", "is", "null")   # ✅ Only rows where label IS NULL
 		    .execute()
 		)
 
